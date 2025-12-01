@@ -8,7 +8,7 @@ const cors = require('cors');
 app.use(cors());
 
 
-app.use('/api', authRoutes);
+app.use('/api/auth', authRoutes);
 
 
 

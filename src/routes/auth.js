@@ -3,65 +3,53 @@ const { PrismaClient } = require("../../generated/prisma");
 const router =express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
+const { google } = require("googleapis");
 
 const prisma = new PrismaClient();
-//signup
-router.post("/signup", async (req, res) => {
-    const { name, email, password } = req.body;
-    try{
-        const userExist=await prisma.user.findUnique({where:{email}});
+const { signup, login } = require("../controllers/authController");
+const { getGoogleAuthURL, oauth2Client } = require("../auth/googleAuth");
 
-        if (userExist){
-            return res.status(400).json({ message: "User already exists" });
-        }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser=await prisma.user.create({
-            data:{
-                name,
-                email,
-                password:hashedPassword,
-            }
+router.post("/signup", signup);
+router.post("/login", login);
+
+router.get("/google",(req, res) => {
+  res.redirect(getGoogleAuthURL());
+});
+
+router.get("/google/callback", async(req, res) => {
+    try {
+        const code = req.query.code;
+        const {tokens} = await oauth2Client.getToken(code);
+        oauth2Client.setCredentials(tokens);
+
+        const userInfo = await google.oauth2("v2").userinfo.get({
+        auth: oauth2Client,
         });
+        const { email, name } = userInfo.data;
         
-        const token = jwt.sign({userId: newUser.id}, process.env.JWT_SECRET, {expiresIn: '5h'});
+        let user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+        // Create user with a random password for OAuth users
+        const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
+        user = await prisma.user.create({
+            data: {name, email, password: randomPassword},
+        });
+        }
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+            expiresIn: "12h",})
 
-        res.status(201).json({ message: "Signup successful",token,
-            user: { id: newUser.id, name: newUser.name, email: newUser.email }
-        });  
-
+        // Redirect to homepage with token, name, and email
+        const redirectUrl = `${process.env.FRONTEND_URL}?token=${token}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+        res.redirect(redirectUrl);
     } catch (error) {
-        console.error("Signup Error:", error.message);
-        console.error("Full Error:", error);
-        res.status(500).json({ message: "Server error during signup", error: error.message });
+        console.error("Google OAuth Error:", error);
+        res.redirect(`${process.env.FRONTEND_URL}?error=authentication_failed`);
     }
 })
 
-//login
-router.post("/login", async (req, res) => {
-    const { email, password } = req.body;
-    try{
-        const user=await prisma.user.findUnique({where:{email}});
-        if(!user){
-            return res.status(400).json({ message: "Invalid credentials" });
 
-        }
 
-        const isMatch= await bcrypt.compare(password, user.password);
-        if(!isMatch){
-            return res.status(400).json({ message: "Invalid credentials" });
-        }
 
-        const token = jwt.sign({userId: user.id}, process.env.JWT_SECRET, {expiresIn: '5h'});
 
-        res.json({ message: "Login successful",token,
-            user: { id: user.id, name: user.name, email: user.email }
-        })
-    } catch (error) {
-        console.error("Login Error:", error);
-        res.status(500).json({ message: "Server error during login" });
-    }
-
-})
 
 module.exports = router;
