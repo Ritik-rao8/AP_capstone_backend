@@ -21,6 +21,25 @@ model User {
   email     String   @unique
   password  String
   createdAt DateTime @default(now())
+  profile   Profile?
+}
+
+model Profile {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ign         String?
+  rank        String?
+  role        String?
+  kd          Float?
+  level       Int?
+  device      String?
+  sensitivity String?
+  about       String?
+  phone       String?
+  discordId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 

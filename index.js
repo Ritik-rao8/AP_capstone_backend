@@ -4,11 +4,13 @@ const app = express();
 app.use(express.json());
 require('dotenv').config();
 const authRoutes = require('./src/routes/auth');
+const profileRoutes = require('./src/routes/profile');
 const cors = require('cors');
 app.use(cors());
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 
 
 
