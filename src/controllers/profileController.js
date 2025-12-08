@@ -113,4 +113,19 @@ async function getProfileById(req,res){
     }
 }
 
-module.exports={getMyProfile,saveProfile,getAllProfiles,getProfileById}
+async function deleteMyProfile(req,res){
+    try{
+        const userId=req.user.userId
+        const existing=await prisma.profile.findUnique({where:{userId}})
+        if(!existing){
+            return res.status(404).json({message:"Profile not found"})
+        }
+        await prisma.profile.delete({where:{userId}})
+        res.json({message:"Profile deleted successfully"})
+    }catch(error){
+        console.error("Delete profile error:",error)
+        res.status(500).json({message:"Server error"})
+    }
+}
+
+module.exports={getMyProfile,saveProfile,getAllProfiles,getProfileById,deleteMyProfile}
